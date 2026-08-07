@@ -39,7 +39,7 @@ Runtime use and `just preflight` do require the subscription sessions and model 
 Clone the repository and inspect the available commands:
 
 ```bash
-git clone https://github.com/laurencehook-lr/model-rocket.git
+git clone https://github.com/uf-side-quests/model-rocket.git
 cd model-rocket
 just --list
 ```

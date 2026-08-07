@@ -79,7 +79,7 @@ The JavaScript wrapper is not used at runtime.
 ### 2. Build and install Model Rocket
 
 ```bash
-git clone https://github.com/laurencehook-lr/model-rocket.git
+git clone https://github.com/uf-side-quests/model-rocket.git
 cd model-rocket
 
 cargo build --release --locked

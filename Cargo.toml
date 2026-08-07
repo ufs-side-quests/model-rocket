@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.94.1"
 description = "A local Claude Code model router for Anthropic and GPT subscription models"
 license = "Apache-2.0"
-repository = "https://github.com/laurencehook-lr/model-rocket"
+repository = "https://github.com/uf-side-quests/model-rocket"
 readme = "README.md"
 publish = false
 
