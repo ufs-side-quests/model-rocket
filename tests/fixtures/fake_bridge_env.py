@@ -39,7 +39,6 @@ if ambient_leaks:
 if len(sys.argv) > 1 and sys.argv[1] == "launcher-contract":
     print("default_claude_model=claude-fable-5")
     print("canonical_gpt_model=anthropic-model-rocket-gpt-5.6-sol-normal-high")
-    print("required_claude_version=2.1.223 (Claude Code)")
     print("gpt_context_tokens=272000")
     print("bridge_startup_attempts=300")
     sys.exit(0)
@@ -154,12 +153,13 @@ if len(sys.argv) == 3 and sys.argv[1] == "validate-claude":
         digest = hashlib.sha256(claude_handle.read()).hexdigest()
     expected = os.environ.get(
         "MODEL_ROCKET_TEST_CLAUDE_SHA256",
-        "05d117bf8a34403faa57b73c6e68c11a2ccb5add172cd72cfb46a55af88d621a",
+        "5c5aed591e599813a718244491a8dadce8db5b670bdc14f3a87f7d2da2edb0eb",
     )
     if digest != expected:
         sys.stderr.write("configuration error: Claude Code executable digest changed\n")
         sys.exit(1)
-    print(claude_path)
+    print("path=" + claude_path)
+    print("version=2.1.999")
     sys.exit(0)
 
 

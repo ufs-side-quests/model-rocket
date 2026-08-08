@@ -8,6 +8,7 @@ use std::{
         Arc, OnceLock, Weak,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
+    time::Instant,
 };
 
 use serde_json::Value;
@@ -344,6 +345,8 @@ impl AppServerConnection {
         provider_endpoint: Option<&reqwest::Url>,
         catalogue: Option<Arc<crate::domain::ModelCatalogue>>,
     ) -> Result<Arc<Self>, BridgeError> {
+        let started = Instant::now();
+        d::info_process_starting();
         let codex_bin = codex::executable::revalidate(executable)?;
         verify_codex_version(&codex_bin).await?;
         let isolated_home = IsolatedCodexHome::create(catalogue.as_deref())?;
@@ -394,6 +397,7 @@ impl AppServerConnection {
         let mut child = command
             .spawn()
             .map_err(|error| d::unavailable(d::START_CODEX_CONTEXT, error))?;
+        let process_id = child.id();
         let stdin = child
             .stdin
             .take()
@@ -419,6 +423,7 @@ impl AppServerConnection {
             Self::read_loop(BufReader::new(stdout), weak).await;
         });
         connection.initialize().await?;
+        d::info_process_ready(process_id, started.elapsed());
         Ok(connection)
     }
 }
@@ -976,6 +981,7 @@ impl AppServerConnection {
         if !self.alive.swap(CONNECTION_FAILED_STATE, Ordering::AcqRel) {
             return;
         }
+        d::warn_process_failed();
         let _stored = self.failure.set(error.clone());
         if let Err(kill_error) = self.child.lock().await.start_kill() {
             d::warn_process_kill(kill_error);

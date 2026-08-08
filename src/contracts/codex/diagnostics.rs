@@ -1,6 +1,6 @@
 //! Codex adapter diagnostics kept outside the literal-free adapter boundary.
 
-use std::{fmt::Display, path::Path};
+use std::{fmt::Display, path::Path, time::Duration};
 
 use crate::{domain::BridgeError, product::CODEX_CLI_VERSION_OUTPUT};
 
@@ -207,4 +207,20 @@ pub(crate) fn warn_home_cleanup(path: &Path, error: impl Display) {
 
 pub(crate) fn warn_process_kill(error: impl Display) {
     tracing::warn!(%error, "cannot terminate failed Codex App Server process");
+}
+
+pub(crate) fn info_process_starting() {
+    tracing::info!("Codex App Server starting");
+}
+
+pub(crate) fn info_process_ready(process_id: Option<u32>, elapsed: Duration) {
+    tracing::info!(
+        ?process_id,
+        startup_ms = elapsed.as_secs_f64() * 1000.0,
+        "Codex App Server ready"
+    );
+}
+
+pub(crate) fn warn_process_failed() {
+    tracing::warn!("Codex App Server connection failed");
 }

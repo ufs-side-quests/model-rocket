@@ -25,6 +25,21 @@ impl Drop for TemporaryDirectory {
     }
 }
 
+fn create_expired_runtime_log(
+    launcher_home: &Path,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    let directory = launcher_home.join(".local/state/model-rocket/logs");
+    fs::create_dir_all(&directory)?;
+    let log = directory.join("model-rocket.log.expired");
+    fs::write(&log, "expired")?;
+    let touch_status = Command::new("touch")
+        .args(["-t", "200001010000"])
+        .arg(&log)
+        .status()?;
+    assert!(touch_status.success(), "failed to age retained-log fixture");
+    Ok(log)
+}
+
 const HOSTILE_PROJECT_SETTINGS: &str = r#"{
   "apiKeyHelper": "/tmp/hostile-api-key-helper",
   "availableModels": ["hostile-model"],
@@ -77,7 +92,8 @@ const HOSTILE_PROJECT_SETTINGS: &str = r#"{
 }"#;
 
 #[test]
-fn launcher_isolates_bridge_and_claude_environments() -> Result<(), Box<dyn std::error::Error>> {
+fn launcher_isolates_environments_and_retains_failure_log() -> Result<(), Box<dyn std::error::Error>>
+{
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let fixtures = root.join("tests/fixtures");
     let launcher_bin = fixtures.join("launcher-bin");
@@ -86,6 +102,7 @@ fn launcher_isolates_bridge_and_claude_environments() -> Result<(), Box<dyn std:
     let launcher_home = TemporaryDirectory::create("launcher-home")?;
     let caller_directory = TemporaryDirectory::create("hostile-settings")?;
     let proof = caller_directory.path().join("launcher-proof");
+    let expired_log = create_expired_runtime_log(launcher_home.path())?;
     let default_bridge = launcher_home.path().join(".local/bin/model-rocket-bridge");
     fs::create_dir_all(
         default_bridge
@@ -149,14 +166,29 @@ fn launcher_isolates_bridge_and_claude_environments() -> Result<(), Box<dyn std:
         .env("CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "must-not-win")
         .env("CLAUDE_CODE_OAUTH_SCOPES", "must-not-win")
         .env("CLAUDE_CODE_SUBAGENT_MODEL", "must-not-win")
+        .env("MODEL_ROCKET_TEST_CLAUDE_EXIT_STATUS", "23")
         .output()?;
-    if !output.status.success() {
-        return Err(std::io::Error::other(format!(
-            "launcher failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ))
-        .into());
-    }
+    assert_eq!(output.status.code(), Some(23));
+    let stderr = String::from_utf8(output.stderr)?;
+    let log_path = stderr
+        .lines()
+        .find_map(|line| line.strip_prefix("Model Rocket log: "))
+        .ok_or("launcher did not report its runtime log path")?;
+    let log_path = Path::new(log_path);
+    assert!(
+        log_path.exists(),
+        "runtime log was removed when Claude Code exited"
+    );
+    assert_eq!(fs::metadata(log_path)?.permissions().mode() & 0o777, 0o600);
+    let log_directory = log_path.parent().ok_or("runtime log has no directory")?;
+    assert_eq!(
+        fs::metadata(log_directory)?.permissions().mode() & 0o777,
+        0o700
+    );
+    let runtime_log = fs::read_to_string(log_path)?;
+    assert!(runtime_log.contains("launcher event=claude_start"));
+    assert!(runtime_log.contains("launcher event=claude_exit status=23"));
+    assert!(!expired_log.exists(), "expired runtime log was not removed");
     let evidence = std::fs::read_to_string(&proof)?;
     assert_launch_files_removed(&evidence)?;
     Ok(())

@@ -6,7 +6,6 @@ use crate::domain::ModelCatalogue;
 
 pub const MANAGED_ACCOUNT_TYPE: &str = "chatgpt";
 pub const CODEX_CLI_VERSION_OUTPUT: &str = "codex-cli 0.146.0";
-pub const CLAUDE_CODE_VERSION_OUTPUT: &str = "2.1.223 (Claude Code)";
 pub const DEFAULT_CLAUDE_MODEL: &str = "claude-fable-5";
 pub const DEFAULT_AVAILABLE_CLAUDE_MODELS: [&str; 4] = ["fable", "opus", "sonnet", "haiku"];
 pub const CODEX_BASE_INSTRUCTIONS: &str =
@@ -27,19 +26,6 @@ pub const CODEX_NATIVE_SHA256: &str =
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub const CODEX_NATIVE_SHA256: &str =
     "2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04";
-
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-pub const CLAUDE_NATIVE_SHA256: &str =
-    "fcbe0b8d47570c501302dd1ad31cc26ac2810f022c45fa253936a6961dee32bf";
-#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-pub const CLAUDE_NATIVE_SHA256: &str =
-    "350e657428a6d34f7cf71f6738c5ebb6a1952ccb12fc1747f64297e065b1846f";
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-pub const CLAUDE_NATIVE_SHA256: &str =
-    "60e83d8db0e894d0e54413e5e7daa256d180db660f51e139a51b614fc30cf3ac";
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-pub const CLAUDE_NATIVE_SHA256: &str =
-    "98226474f802e3094d6a86c5ade8883c16206d0fcb5c400b7401c800063e99d7";
 
 #[cfg(not(any(
     all(target_os = "macos", target_arch = "aarch64"),
@@ -62,7 +48,6 @@ pub fn write_launcher_contract(
     for (key, value) in [
         ("default_claude_model", DEFAULT_CLAUDE_MODEL),
         ("canonical_gpt_model", canonical.claude_model.as_str()),
-        ("required_claude_version", CLAUDE_CODE_VERSION_OUTPUT),
     ] {
         writeln!(output, "{key}={value}")?;
     }

@@ -992,7 +992,7 @@ html&gt;body{padding:0}&lt;/style&gt;
 
   &lt;div class="architecture" aria-label="Model Rocket request routing diagram"&gt;
     &lt;div class="node"&gt;
-      &lt;strong&gt;Claude Code 2.1.223&lt;/strong&gt;
+      &lt;strong&gt;Official Claude Code&lt;/strong&gt;
       &lt;small&gt;Unmodified official binary&lt;/small&gt;
       &lt;small&gt;Normal Messages API request&lt;/small&gt;
     &lt;/div&gt;
@@ -1089,7 +1089,7 @@ html&gt;body{padding:0}&lt;/style&gt;
         &lt;tr&gt;
           &lt;td&gt;Patched Claude Code behind an intercepting proxy&lt;/td&gt;
           &lt;td&gt;&lt;span class="status closed"&gt;Not applicable&lt;/span&gt;&lt;/td&gt;
-          &lt;td&gt;The official Claude Code binary is launched unchanged through documented base-URL configuration. Its native format and pinned release digest are checked before and after the version probe.&lt;/td&gt;
+          &lt;td&gt;The official Claude Code binary is launched unchanged through documented base-URL configuration. Its native format, target, size, and digest are checked against Anthropic&#x27;s official version-specific manifest before and after the version probe.&lt;/td&gt;
         &lt;/tr&gt;
         &lt;tr&gt;
           &lt;td&gt;Community npm package holds broad trust&lt;/td&gt;
@@ -1108,8 +1108,8 @@ html&gt;body{padding:0}&lt;/style&gt;
         &lt;/tr&gt;
         &lt;tr&gt;
           &lt;td&gt;Repatch after every Claude Code update&lt;/td&gt;
-          &lt;td&gt;&lt;span class="status partial"&gt;Partly removed&lt;/span&gt;&lt;/td&gt;
-          &lt;td&gt;There is nothing to repatch. Versions and protocol contracts remain pinned, so each vendor update still requires compatibility testing and a new release.&lt;/td&gt;
+          &lt;td&gt;&lt;span class="status closed"&gt;Removed for Claude Code&lt;/span&gt;&lt;/td&gt;
+          &lt;td&gt;There is nothing to repatch. Claude Code updates are verified dynamically against Anthropic&#x27;s official release manifest. Codex remains pinned because Model Rocket directly translates its App Server protocol.&lt;/td&gt;
         &lt;/tr&gt;
         &lt;tr&gt;
           &lt;td&gt;SOC 2 and ISO 27001 approval&lt;/td&gt;
@@ -1122,7 +1122,7 @@ html&gt;body{padding:0}&lt;/style&gt;
 
   &lt;div class="decision"&gt;
     &lt;strong&gt;Current decision: safer architecture, not yet approved for Ledger Rocket source.&lt;/strong&gt;
-    &lt;span&gt;Model Rocket now includes pinned Claude Code and Codex executable revalidation, strict ports-and-adapters enforcement, literal-free adapter boundaries, and automated multi-route wire coverage. Deployment with company source still requires interactive acceptance with the pinned vendor clients, confirmation that no CA from the retired package remains installed, and company/vendor approval.&lt;/span&gt;
+    &lt;span&gt;Model Rocket now includes dynamic official Claude Code verification, pinned Codex executable revalidation, strict ports-and-adapters enforcement, literal-free adapter boundaries, and automated multi-route wire coverage. Deployment with company source still requires interactive acceptance with the verified vendor clients, confirmation that no CA from the retired package remains installed, and company/vendor approval.&lt;/span&gt;
   &lt;/div&gt;
 
   &lt;footer class="sources text-small"&gt;

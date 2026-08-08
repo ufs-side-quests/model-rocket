@@ -17,6 +17,7 @@ project_dir="$(cd "$script_dir/.." && pwd)"
 : "${MODEL_ROCKET_CODEX_BIN:=$HOME/.local/bin/codex-native}"
 : "${MODEL_ROCKET_BRIDGE_BIN:=$HOME/.local/bin/model-rocket-bridge}"
 : "${MODEL_ROCKET_CONFIG:=${XDG_CONFIG_HOME:-$HOME/.config}/model-rocket/model-routes.json}"
+: "${MODEL_ROCKET_LOG_DIR:=${XDG_STATE_HOME:-$HOME/.local/state}/model-rocket/logs}"
 user_cwd="$PWD"
 
 for argument in "$@"; do
@@ -31,7 +32,15 @@ done
 
 bearer="$(openssl rand -hex 32)"
 
-log_file="$(mktemp -t model-rocket.XXXXXX.log)"
+if [[ "$MODEL_ROCKET_LOG_DIR" != /* ]]; then
+  echo "Model Rocket log directory must be absolute: $MODEL_ROCKET_LOG_DIR" >&2
+  exit 1
+fi
+mkdir -p "$MODEL_ROCKET_LOG_DIR"
+chmod 700 "$MODEL_ROCKET_LOG_DIR"
+find "$MODEL_ROCKET_LOG_DIR" -type f -name 'model-rocket.log.*' -mtime +6 -delete
+log_file="$(mktemp "$MODEL_ROCKET_LOG_DIR/model-rocket.log.XXXXXX")"
+chmod 600 "$log_file"
 ready_file="$(mktemp -t model-rocket.XXXXXX.ready)"
 routing_settings_file=""
 catalogue_snapshot=""
@@ -67,7 +76,6 @@ cleanup() {
     fi
     wait "$bridge_pid" 2>/dev/null || true
   fi
-  rm -f "$log_file"
   rm -f "$ready_file"
   if [[ -n "$routing_settings_file" ]]; then
     rm -f "$routing_settings_file"
@@ -114,7 +122,6 @@ export MODEL_ROCKET_CONFIG="$catalogue_snapshot"
 default_claude_model=""
 canonical_gpt_model=""
 gpt_context_tokens=""
-required_claude_version=""
 bridge_startup_attempts=""
 launcher_contract="$(
   env -i \
@@ -128,7 +135,6 @@ while IFS='=' read -r contract_key contract_value; do
   default_claude_model) default_claude_model="$contract_value" ;;
   canonical_gpt_model) canonical_gpt_model="$contract_value" ;;
   gpt_context_tokens) gpt_context_tokens="$contract_value" ;;
-  required_claude_version) required_claude_version="$contract_value" ;;
   bridge_startup_attempts) bridge_startup_attempts="$contract_value" ;;
   *)
     echo "Bridge returned an unknown launcher contract field: $contract_key" >&2
@@ -140,7 +146,6 @@ for contract_value in \
   "$default_claude_model" \
   "$canonical_gpt_model" \
   "$gpt_context_tokens" \
-  "$required_claude_version" \
   "$bridge_startup_attempts"; do
   if [[ -z "$contract_value" ]]; then
     echo "Bridge returned an incomplete launcher contract." >&2
@@ -186,12 +191,28 @@ if [[ ! -x "$MODEL_ROCKET_CLAUDE_BIN" ]]; then
   exit 1
 fi
 
-validated_claude_bin="$(env -i \
+validated_claude_contract="$(env -i \
   HOME="$HOME" \
   PATH="/usr/bin:/bin" \
   "$bridge_bin" validate-claude "$MODEL_ROCKET_CLAUDE_BIN")"
+validated_claude_bin=""
+validated_claude_version=""
+while IFS='=' read -r contract_key contract_value; do
+  case "$contract_key" in
+  path) validated_claude_bin="$contract_value" ;;
+  version) validated_claude_version="$contract_value" ;;
+  *)
+    echo "Bridge returned an unknown Claude validation field: $contract_key" >&2
+    exit 1
+    ;;
+  esac
+done <<<"$validated_claude_contract"
 if [[ "$validated_claude_bin" != /* || ! -x "$validated_claude_bin" ]]; then
   echo "Bridge returned an invalid validated Claude Code executable path: $validated_claude_bin" >&2
+  exit 1
+fi
+if [[ -z "$validated_claude_version" ]]; then
+  echo "Bridge returned an incomplete Claude Code validation contract." >&2
   exit 1
 fi
 MODEL_ROCKET_CLAUDE_BIN="$validated_claude_bin"
@@ -250,8 +271,9 @@ actual_claude_version="$(
   env "${claude_unset_environment[@]}" \
     "$MODEL_ROCKET_CLAUDE_BIN" --version
 )"
-if [[ "$actual_claude_version" != "$required_claude_version" ]]; then
-  echo "Claude Code version mismatch: expected $required_claude_version, got $actual_claude_version" >&2
+expected_claude_version="$validated_claude_version (Claude Code)"
+if [[ "$actual_claude_version" != "$expected_claude_version" ]]; then
+  echo "Claude Code version mismatch: expected $expected_claude_version, got $actual_claude_version" >&2
   exit 1
 fi
 
@@ -264,6 +286,7 @@ env -i \
   LC_ALL="${LC_ALL:-}" \
   SHELL="${SHELL:-/bin/sh}" \
   CODEX_HOME="${CODEX_HOME:-$HOME/.codex}" \
+  RUST_LOG="error" \
   MODEL_ROCKET_CODEX_BIN="$MODEL_ROCKET_CODEX_BIN" \
   MODEL_ROCKET_CONFIG="$MODEL_ROCKET_CONFIG" \
   "$bridge_bin" preflight >/dev/null
@@ -277,13 +300,14 @@ env -i \
   LC_ALL="${LC_ALL:-}" \
   SHELL="${SHELL:-/bin/sh}" \
   CODEX_HOME="${CODEX_HOME:-$HOME/.codex}" \
+  RUST_LOG="${RUST_LOG:-info}" \
   MODEL_ROCKET_BEARER="$bearer" \
   MODEL_ROCKET_LISTEN="$MODEL_ROCKET_LISTEN" \
   MODEL_ROCKET_READY_FILE="$ready_file" \
   MODEL_ROCKET_CWD="$app_server_cwd" \
   MODEL_ROCKET_CODEX_BIN="$MODEL_ROCKET_CODEX_BIN" \
   MODEL_ROCKET_CONFIG="$MODEL_ROCKET_CONFIG" \
-  "$bridge_bin" serve >"$log_file" 2>&1 &
+  "$bridge_bin" serve >>"$log_file" 2>&1 &
 bridge_pid=$!
 
 for (( _attempt = 0; _attempt < bridge_startup_attempts; _attempt++ )); do
@@ -317,6 +341,8 @@ if ! curl --noproxy "$listen_host" --connect-timeout 1 --max-time 2 --fail --sil
   echo "Bridge did not become healthy at http://${listen_addr}." >&2
   exit 1
 fi
+echo "Model Rocket log: $log_file" >&2
+printf '%s\n' 'launcher event=claude_start' >>"$log_file"
 
 proxy_bypass="localhost,127.0.0.1,::1,[::1],${listen_host},${listen_proxy_host}"
 if [[ -n "${NO_PROXY:-}" ]]; then
@@ -341,15 +367,16 @@ env -i \
     "http://${listen_addr}/${bearer}" \
     "$proxy_bypass" >"$routing_settings_file"
 
-revalidated_claude_bin="$(env -i \
+revalidated_claude_contract="$(env -i \
   HOME="$HOME" \
   PATH="/usr/bin:/bin" \
   "$bridge_bin" validate-claude "$MODEL_ROCKET_CLAUDE_BIN")"
-if [[ "$revalidated_claude_bin" != "$MODEL_ROCKET_CLAUDE_BIN" ]]; then
-  echo "Claude Code executable path changed after validation." >&2
+if [[ "$revalidated_claude_contract" != "$validated_claude_contract" ]]; then
+  echo "Claude Code executable validation changed before launch." >&2
   exit 1
 fi
 
+set +e
 env "${claude_unset_environment[@]}" \
   ANTHROPIC_BASE_URL="http://${listen_addr}/${bearer}" \
   ANTHROPIC_CUSTOM_MODEL_OPTION="$canonical_gpt_model" \
@@ -358,3 +385,7 @@ env "${claude_unset_environment[@]}" \
   no_proxy="$proxy_bypass" \
   "$MODEL_ROCKET_CLAUDE_BIN" --model "$MODEL_ROCKET_DEFAULT_MODEL" --add-dir "$user_cwd" \
     --settings "$routing_settings_file" "$@"
+claude_exit_status=$?
+set -e
+printf 'launcher event=claude_exit status=%d\n' "$claude_exit_status" >>"$log_file"
+exit "$claude_exit_status"
