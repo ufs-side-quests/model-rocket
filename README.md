@@ -34,11 +34,11 @@ GPT requests use the official Codex App Server and ChatGPT session.
 
 ## Quick start
 
-Model Rocket currently pins these exact releases:
+Model Rocket verifies these runtime dependencies:
 
 | Component             | Required version         |
 | --------------------- | ------------------------ |
-| Claude Code           | `2.1.223` native release |
+| Claude Code           | Official native release  |
 | Codex CLI             | `0.146.0` native release |
 | Shipped GPT catalogue | `gpt-5.6-sol`            |
 | Rust                  | `1.94.1`                 |
@@ -51,12 +51,15 @@ The ChatGPT subscription session must expose every model listed in `models`, cur
 
 ### 1. Install and sign in to the vendor CLIs
 
-Install the official native [Claude Code][claude-setup] release.
-Sign in with your Anthropic subscription, then pin the supported version:
+Install the current stable official native [Claude Code][claude-setup] release.
+Sign in with your Anthropic subscription:
 
 ```bash
-claude install 2.1.223
+claude install stable
 ```
+
+Claude Code can update normally after installation.
+At each launch, Model Rocket resolves the installed version and verifies its native artifact against Anthropic's official version-specific release manifest.
 
 Install the pinned Codex package.
 Copy its native executable to a stable path, then sign in with ChatGPT:
@@ -236,8 +239,9 @@ Model Rocket is deliberately narrower than a general-purpose proxy:
 - It accepts no vendor credentials as configuration and persists none.
 - Claude Code's OAuth bearer exists only for the current request.
 - It is forwarded only to the fixed Anthropic origin.
-- It accepts only pinned native Claude Code and Codex executables.
-- It checks target-specific SHA-256 digests.
+- It accepts only native Claude Code and Codex executables.
+- It verifies Claude Code's target, size, and SHA-256 digest against Anthropic's official manifest for the installed version.
+- It checks Codex against Model Rocket's pinned target-specific SHA-256 digest.
 - It revalidates Claude Code immediately before launch.
 - It revalidates Codex immediately before every App Server spawn.
 - It strips caller proxy variables from Claude Code and unrelated credentials and proxy variables from the Codex child environment.
@@ -255,8 +259,10 @@ Current terms may not permit Codex subscription use through another harness.
 Review both vendors' terms before use.
 Get your organisation's approval before using company code or credentials.
 
-The strict vendor binary pins are intentional.
-New vendor releases, native digests, and wire behaviour require a reviewed Model Rocket release.
+Claude Code release provenance is verified dynamically, so ordinary Claude Code updates do not require a Model Rocket release.
+The launcher requires network access to Anthropic's official release host for this fail-closed verification.
+An official Claude Code release can still change behaviour; an incompatible release fails visibly and needs a Model Rocket compatibility fix.
+Codex remains strictly pinned because its App Server wire contract is the protocol Model Rocket translates.
 New catalogue models do not require recompilation, but they must be exposed by the pinned Codex App Server and satisfy the supported Messages, tools, usage, and streaming contract.
 
 Claude Code exposes one additive custom picker entry in this mode.
@@ -289,15 +295,21 @@ Fable remains the lead model.
 ## Troubleshooting
 
 - CMUX can place wrapper commands such as `codex` and `node` before ordinary binaries on `PATH`.
-  Model Rocket does not invoke those wrappers: it uses the installed Claude Code, Codex, and bridge executables by absolute path and verifies their native digests.
+  Model Rocket does not invoke those wrappers: it uses the installed Claude Code, Codex, and bridge executables by absolute path and verifies their native provenance.
   No CMUX-specific setting or certificate is required.
-- `Claude Code executable digest does not match`: Claude Code probably auto-updated.
-  Reinstall the supported release with `claude install 2.1.223 --force`.
+- `Claude Code executable digest does not match`: the installed file does not match Anthropic's official manifest for that version.
+  Reinstall the current stable release with `claude install stable --force`.
+- `cannot fetch the official Claude Code manifest`: restore access to `downloads.claude.ai`; Model Rocket deliberately does not use a stale or unverified fallback.
 - `Codex native executable digest does not match`: reinstall the pinned Codex
   package and repeat the native-copy step.
 - `modelOverrides is incompatible with Model Rocket`: remove that setting.
 - An old `sol` or `gpt-5.6-sol` Claude session cannot resume through Model Rocket.
   Start a new session and select one of the exact route IDs above.
+
+The launcher prints the runtime log path after Model Rocket becomes healthy.
+Open another terminal and run `tail -f <reported-path>` during or after the Claude session.
+The log records provider routing, queue wait, App Server startup, first GPT output, total duration, and terminal outcome without prompts, responses, session IDs, credentials, or repository paths.
+The owner-only log records Claude Code's exit status, survives process exit for diagnosis, and is removed automatically after seven days.
 
 ## Development
 

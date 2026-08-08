@@ -57,7 +57,7 @@ if [[ "${1:-}" == "--version" ]]; then
     fi
     printf '%s\n' '# replaced after version validation' >>"$0"
   fi
-  printf '%s\n' "2.1.223 (Claude Code)"
+  printf '%s\n' "2.1.999 (Claude Code)"
   exit 0
 fi
 if [[ ! "${ANTHROPIC_BASE_URL:-}" =~ ^http://127\.0\.0\.1:[0-9]+/[0-9a-f]{64}$ ]]; then
@@ -216,3 +216,5 @@ printf '%s\n%s\n%s\n' \
   "launcher environment isolated" \
   "$settings_file" \
   "$MODEL_ROCKET_CONFIG" >"$LAUNCHER_PROOF_FILE"
+
+exit "${MODEL_ROCKET_TEST_CLAUDE_EXIT_STATUS:-0}"

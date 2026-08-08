@@ -1041,6 +1041,70 @@ fn production_logging_sites_are_a_closed_secret_free_set() -> Result<(), Box<dyn
             String::from("address = % local_addr , \"bridge listening\""),
         ),
         (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "provider = \"gpt\" , route = % route . as_str () , continuation , queue_wait_ms = queue_started . elapsed () . as_secs_f64 () * 1000.0 , available_permits = self . admission . available_permits () , \"model turn admitted\"",
+            ),
+        ),
+        (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "provider = \"gpt\" , route = % route . claude_model . as_str () , session_ready_ms = session_started . elapsed () . as_secs_f64 () * 1000.0 , \"model session ready\"",
+            ),
+        ),
+        (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "provider = \"gpt\" , route = % route , streaming , \"model request started\"",
+            ),
+        ),
+        (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "provider = \"gpt\" , route = % route , duration_ms = started . elapsed () . as_secs_f64 () * 1000.0 , outcome = assistant_result_label (& result) , \"model request finished\"",
+            ),
+        ),
+        (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from("provider = \"anthropic\" , \"model request started\""),
+        ),
+        (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "provider = \"anthropic\" , duration_ms = started . elapsed () . as_secs_f64 () * 1000.0 , outcome = request_result_label (& result) , \"model request finished\"",
+            ),
+        ),
+        (
+            String::from("src/application/model_router.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "provider = \"gpt\" , route = % self . route , first_output_ms = self . started . elapsed () . as_secs_f64 () * 1000.0 , \"model first output\"",
+            ),
+        ),
+        (
+            String::from("src/contracts/codex/diagnostics.rs"),
+            String::from("tracing::info"),
+            String::from("\"Codex App Server starting\""),
+        ),
+        (
+            String::from("src/contracts/codex/diagnostics.rs"),
+            String::from("tracing::info"),
+            String::from(
+                "? process_id , startup_ms = elapsed . as_secs_f64 () * 1000.0 , \"Codex App Server ready\"",
+            ),
+        ),
+        (
+            String::from("src/contracts/codex/diagnostics.rs"),
+            String::from("tracing::warn"),
+            String::from("\"Codex App Server connection failed\""),
+        ),
+        (
             String::from("src/contracts/codex/diagnostics.rs"),
             String::from("tracing::warn"),
             String::from(

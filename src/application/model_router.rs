@@ -1,12 +1,16 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Instant,
 };
 
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use tokio::{
-    sync::{RwLock, Semaphore},
+    sync::{RwLock, Semaphore, SemaphorePermit},
     time::sleep,
 };
 use uuid::Uuid;
@@ -88,6 +92,28 @@ impl ModelRouterService {
         }
     }
 
+    async fn admit_turn(
+        &self,
+        route: &ClaudeModelId,
+        continuation: bool,
+    ) -> Result<SemaphorePermit<'_>, BridgeError> {
+        let queue_started = Instant::now();
+        let permit = self
+            .admission
+            .acquire()
+            .await
+            .map_err(|_| BridgeError::unavailable("GPT turn scheduler is unavailable"))?;
+        tracing::info!(
+            provider = "gpt",
+            route = %route.as_str(),
+            continuation,
+            queue_wait_ms = queue_started.elapsed().as_secs_f64() * 1000.0,
+            available_permits = self.admission.available_permits(),
+            "model turn admitted"
+        );
+        Ok(permit)
+    }
+
     /// Executes one initial or continuing model request.
     ///
     /// # Errors
@@ -124,11 +150,7 @@ impl ModelRouterService {
                 route,
                 ..
             } = session;
-            let _turn_permit = self
-                .admission
-                .acquire()
-                .await
-                .map_err(|_| BridgeError::unavailable("GPT turn scheduler is unavailable"))?;
+            let _turn_permit = self.admit_turn(&route, true).await?;
             let outcome = model_session
                 .continue_tool(
                     ContinueModelTurn::new(
@@ -144,12 +166,15 @@ impl ModelRouterService {
                 .await;
         }
 
-        let _turn_permit = self
-            .admission
-            .acquire()
-            .await
-            .map_err(|_| BridgeError::unavailable("GPT turn scheduler is unavailable"))?;
+        let _turn_permit = self.admit_turn(&route.claude_model, false).await?;
+        let session_started = Instant::now();
         let mut model_session = self.session_factory.launch().await?;
+        tracing::info!(
+            provider = "gpt",
+            route = %route.claude_model.as_str(),
+            session_ready_ms = session_started.elapsed().as_secs_f64() * 1000.0,
+            "model session ready"
+        );
         let prompt = model_prompt(request.conversation());
         let developer_instructions =
             developer_instructions(request.system(), request.output_limit());
@@ -190,17 +215,45 @@ impl ModelRouterService {
                 streaming,
                 execution,
             } => {
+                let started = Instant::now();
+                let route = model.as_str().to_owned();
+                tracing::info!(
+                    provider = "gpt",
+                    route = %route,
+                    streaming,
+                    "model request started"
+                );
                 output
                     .start(ModelResponseHead::Assistant { model, streaming })
                     .await?;
-                let model_output = RoutedModelOutput(output);
-                self.handle(authorization, execution, &model_output)
-                    .await
-                    .map(ModelResponseEnd::Assistant)
+                let model_output = RoutedModelOutput {
+                    sink: output,
+                    route: route.clone(),
+                    started,
+                    first_output_logged: AtomicBool::new(false),
+                };
+                let result = self.handle(authorization, execution, &model_output).await;
+                tracing::info!(
+                    provider = "gpt",
+                    route = %route,
+                    duration_ms = started.elapsed().as_secs_f64() * 1000.0,
+                    outcome = assistant_result_label(&result),
+                    "model request finished"
+                );
+                result.map(ModelResponseEnd::Assistant)
             }
             ModelRequest::Anthropic(request) => {
+                let started = Instant::now();
+                tracing::info!(provider = "anthropic", "model request started");
                 let anthropic_output = RoutedAnthropicOutput(output);
-                self.anthropic.exchange(request, &anthropic_output).await?;
+                let result = self.anthropic.exchange(request, &anthropic_output).await;
+                tracing::info!(
+                    provider = "anthropic",
+                    duration_ms = started.elapsed().as_secs_f64() * 1000.0,
+                    outcome = request_result_label(&result),
+                    "model request finished"
+                );
+                result?;
                 Ok(ModelResponseEnd::Anthropic)
             }
         }
@@ -279,11 +332,36 @@ impl ModelRouter for ModelRouterService {
     }
 }
 
-struct RoutedModelOutput<'a>(&'a dyn ModelResponseSink);
+fn assistant_result_label(result: &Result<AssistantOutcome, BridgeError>) -> &'static str {
+    match result {
+        Ok(AssistantOutcome::Text { .. }) => "text",
+        Ok(AssistantOutcome::ToolCall(_)) => "tool_call",
+        Err(_) => "error",
+    }
+}
+
+fn request_result_label(result: &Result<(), BridgeError>) -> &'static str {
+    if result.is_ok() { "ok" } else { "error" }
+}
+
+struct RoutedModelOutput<'a> {
+    sink: &'a dyn ModelResponseSink,
+    route: String,
+    started: Instant,
+    first_output_logged: AtomicBool,
+}
 
 impl ModelOutput for RoutedModelOutput<'_> {
     fn emit(&self, delta: AssistantTextDelta) -> PortFuture<'_, ()> {
-        self.0.emit(ModelResponseChunk::Assistant(delta))
+        if !self.first_output_logged.swap(true, Ordering::Relaxed) {
+            tracing::info!(
+                provider = "gpt",
+                route = %self.route,
+                first_output_ms = self.started.elapsed().as_secs_f64() * 1000.0,
+                "model first output"
+            );
+        }
+        self.sink.emit(ModelResponseChunk::Assistant(delta))
     }
 }
 

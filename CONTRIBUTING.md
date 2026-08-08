@@ -10,7 +10,7 @@ Report suspected vulnerabilities privately by following [SECURITY.md](SECURITY.m
 ## Understand the project boundary
 
 Model Rocket does not patch Claude Code, intercept TLS, install a certificate authority, or accept API keys as router configuration.
-It uses pinned native Claude Code and Codex executables, subscription sessions owned by those vendor tools, and a bearer-protected loopback listener.
+It uses verified native Claude Code and pinned native Codex executables, subscription sessions owned by those vendor tools, and a bearer-protected loopback listener.
 
 Read these files before changing behaviour:
 
@@ -68,8 +68,9 @@ scripts/model-rocket
 This development launch uses your installed vendor CLIs and subscription sessions.
 It does not replace the isolated automated tests.
 
-Do not update pinned vendor tools or dependencies incidentally.
-A pin change must include its regenerated lockfile or executable digest, focused compatibility tests, and documentation updates.
+Do not update the pinned Codex tool or dependencies incidentally.
+A Codex pin change must include its regenerated lockfile or executable digest, focused compatibility tests, and documentation updates.
+Claude Code versions are verified dynamically against Anthropic's official release manifests; changes to that verification contract require the same focused tests and documentation review.
 
 ## Architecture rules
 

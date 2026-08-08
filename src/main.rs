@@ -48,6 +48,7 @@ async fn main() -> Result<(), BridgeError> {
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_target(false)
+        .with_ansi(false)
         .init();
 
     let mut arguments = std::env::args_os().skip(1);
@@ -64,21 +65,7 @@ async fn main() -> Result<(), BridgeError> {
             claude_settings::validate(arguments)
         }
         Some(command) if command == OsStr::new("validate-claude") => {
-            let path = arguments.next().ok_or_else(|| {
-                BridgeError::configuration("validate-claude requires one executable path")
-            })?;
-            if arguments.next().is_some() {
-                return Err(BridgeError::configuration(
-                    "validate-claude accepts exactly one executable path",
-                ));
-            }
-            let canonical =
-                model_rocket::contracts::claude_executable::validate(std::path::Path::new(&path))?;
-            writeln!(io::stdout().lock(), "{}", canonical.display()).map_err(|error| {
-                BridgeError::unavailable(format!(
-                    "cannot write validated Claude Code executable path: {error}"
-                ))
-            })
+            validate_claude(arguments).await
         }
         Some(command) if command == OsStr::new("guard-settings-change") => {
             reject_trailing_arguments(&mut arguments, "guard-settings-change")?;
@@ -142,6 +129,29 @@ async fn main() -> Result<(), BridgeError> {
             "missing command; expected preflight, serve, validate-settings, validate-claude, guard-settings-change, launcher-contract, launcher-settings, worker-config, canonical-route, or codex-native-sha256",
         )),
     }
+}
+
+async fn validate_claude(
+    mut arguments: impl Iterator<Item = std::ffi::OsString>,
+) -> Result<(), BridgeError> {
+    let path = arguments.next().ok_or_else(|| {
+        BridgeError::configuration("validate-claude requires one executable path")
+    })?;
+    if arguments.next().is_some() {
+        return Err(BridgeError::configuration(
+            "validate-claude accepts exactly one executable path",
+        ));
+    }
+    let validated =
+        model_rocket::contracts::claude_executable::validate(std::path::Path::new(&path)).await?;
+    let mut stdout = io::stdout().lock();
+    writeln!(stdout, "path={}", validated.path().display())
+        .and_then(|()| writeln!(stdout, "version={}", validated.version()))
+        .map_err(|error| {
+            BridgeError::unavailable(format!(
+                "cannot write validated Claude Code executable contract: {error}"
+            ))
+        })
 }
 
 async fn preflight() -> Result<(), BridgeError> {
