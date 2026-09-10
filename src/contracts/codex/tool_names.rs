@@ -9,7 +9,17 @@ use crate::{
 
 const CODEX_TOOL_ALIAS_PREFIX: &str = "model_rocket_tool_";
 const CLAUDE_TOOL_DESCRIPTION_PREFIX: &str = "Claude Code tool name: ";
-const MAX_CLAUDE_TOOL_NAME_BYTES: usize = 64;
+// Bounds the Claude-side name, which never reaches Codex: every tool is aliased
+// to `model_rocket_tool_<index>` and the original travels only inside the alias
+// description. So this is a sanity bound on text the bridge echoes back, not the
+// 64-byte function-name limit the Responses API applies to the alias itself.
+// MCP servers routinely exceed 64 — `mcp__<server>__<action>__<VERB_NOUN_NOUN>`
+// reaches into the seventies — and refusing one refused the whole request,
+// because Claude Code sends its entire tool set every turn. A single long-named
+// MCP tool therefore made every turn fail, including turns that used no tool.
+// 128 matches Anthropic's own tool-name limit, which the name has already
+// satisfied by the time Claude Code sends it.
+const MAX_CLAUDE_TOOL_NAME_BYTES: usize = 128;
 
 #[derive(Debug)]
 pub(crate) struct CodexDynamicTool {
@@ -92,7 +102,7 @@ fn valid_claude_tool_name(name: &str) -> bool {
 mod tests {
     use serde_json::json;
 
-    use super::DynamicToolNames;
+    use super::{DynamicToolNames, MAX_CLAUDE_TOOL_NAME_BYTES};
     use crate::{
         contracts::json as json_contract,
         domain::{ClaudeToolName, ToolDefinition, ToolDescription, ToolSet},
@@ -104,6 +114,26 @@ mod tests {
             ToolDescription::new(description),
             json_contract::object(&json!({"type": "object"}))?,
         ))
+    }
+
+    #[test]
+    fn long_mcp_tool_name_is_aliased_rather_than_rejected() -> Result<(), Box<dyn std::error::Error>>
+    {
+        // An MCP-namespaced action name past the previous bound. It reaches
+        // Codex only as an alias, so its length is no reason to refuse it.
+        let original = "mcp__compliance_platform__action__BULK_UPSERT_QUESTIONNAIRE_ANSWERS";
+        assert!(
+            original.len() > 64,
+            "fixture must exceed the previous bound"
+        );
+        let names = DynamicToolNames::from_claude_tools(&ToolSet::new(vec![tool(
+            original,
+            "Upsert questions and answers",
+        )?]))?;
+        let mapped = names.tools().first().ok_or("the tool was not mapped")?;
+        assert_eq!(mapped.name, "model_rocket_tool_0");
+        assert_eq!(names.claude_name("model_rocket_tool_0")?, original);
+        Ok(())
     }
 
     #[test]
@@ -140,7 +170,10 @@ mod tests {
 
     #[test]
     fn invalid_claude_names_fail_before_aliasing() -> Result<(), Box<dyn std::error::Error>> {
-        for invalid_name in ["", "contains space", "contains.dot", &"x".repeat(65)] {
+        // The over-length case is expressed against the bound itself, so it
+        // keeps testing "one byte too long" if the bound ever moves again.
+        let too_long = "x".repeat(MAX_CLAUDE_TOOL_NAME_BYTES + 1);
+        for invalid_name in ["", "contains space", "contains.dot", &too_long] {
             let Err(error) =
                 DynamicToolNames::from_claude_tools(&ToolSet::new(vec![tool(invalid_name, "")?]))
             else {
