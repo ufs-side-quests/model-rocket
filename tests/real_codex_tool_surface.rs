@@ -223,8 +223,28 @@ async fn real_codex_production_adapter_exposes_only_the_supplied_dynamic_tool()
             ))
         })?;
     assert_eq!(tools.len(), 1, "unexpected model-visible tools: {tools:?}");
+    // Codex wraps host-supplied tools in a `type: "namespace"` container. The
+    // property under test is unchanged — exactly one model-visible tool, and it
+    // is the alias Model Rocket supplied — so descend one level when the
+    // container is present and assert on what it actually holds.
+    let exposed = tools
+        .first()
+        .map(|tool| match tool.get("type").and_then(Value::as_str) {
+            Some("namespace") => tool
+                .get("tools")
+                .and_then(Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or_default(),
+            _ => std::slice::from_ref(tool),
+        })
+        .unwrap_or_default();
     assert_eq!(
-        tools
+        exposed.len(),
+        1,
+        "unexpected model-visible tools: {tools:?}"
+    );
+    assert_eq!(
+        exposed
             .first()
             .and_then(|tool| tool.get("name"))
             .and_then(Value::as_str),

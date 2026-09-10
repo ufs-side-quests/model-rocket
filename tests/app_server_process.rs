@@ -114,7 +114,7 @@ async fn launch_rejects_unpinned_codex_version() -> Result<(), Box<dyn std::erro
     assert!(
         error
             .to_string()
-            .contains("must be exactly codex-cli 0.146.0")
+            .contains("must be exactly codex-cli 0.153.4")
     );
     Ok(())
 }

@@ -39,7 +39,7 @@ Model Rocket verifies these runtime dependencies:
 | Component             | Required version         |
 | --------------------- | ------------------------ |
 | Claude Code           | Official native release  |
-| Codex CLI             | `0.146.0` native release |
+| Codex CLI             | `0.153.4` native release |
 | Shipped GPT catalogue | `gpt-5.6-sol`            |
 | Rust                  | `1.94.1`                 |
 
@@ -65,7 +65,7 @@ Install the pinned Codex package.
 Copy its native executable to a stable path, then sign in with ChatGPT:
 
 ```bash
-npm install --global @openai/codex@0.146.0
+npm install --global @openai/codex@0.153.4
 
 codex_native="$(find "$(npm root -g)/@openai/codex/node_modules/@openai" \
   -type f -path '*/vendor/*/bin/codex' -print -quit)"
