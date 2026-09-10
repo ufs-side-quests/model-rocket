@@ -10,7 +10,7 @@ def send(message):
 
 def run(*, user_agent, thread_id, turn_id, error_message, terminal_status):
     if sys.argv[1:] == ["--version"]:
-        print("codex-cli 0.146.0")
+        print("codex-cli 0.153.4")
         return
 
     for raw_line in sys.stdin:

@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use crate::domain::ModelCatalogue;
 
 pub const MANAGED_ACCOUNT_TYPE: &str = "chatgpt";
-pub const CODEX_CLI_VERSION_OUTPUT: &str = "codex-cli 0.146.0";
+pub const CODEX_CLI_VERSION_OUTPUT: &str = "codex-cli 0.153.4";
 pub const DEFAULT_CLAUDE_MODEL: &str = "claude-fable-5";
 pub const DEFAULT_AVAILABLE_CLAUDE_MODELS: [&str; 4] = ["fable", "opus", "sonnet", "haiku"];
 pub const CODEX_BASE_INSTRUCTIONS: &str =
@@ -16,16 +16,16 @@ pub const BRIDGE_STARTUP_ATTEMPTS: u16 = 300;
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 pub const CODEX_NATIVE_SHA256: &str =
-    "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02";
+    "b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3";
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 pub const CODEX_NATIVE_SHA256: &str =
-    "544e2df9e6f09b3f1ceb0405879c83dd099ec015aeed942bb091ff0f29f60dc2";
+    "88ecd2cbf8044832a49e7710394d9d328f7205fa5e8c8ebbdd015e002b4f6e21";
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 pub const CODEX_NATIVE_SHA256: &str =
-    "cb5e8cb8a333a408ce6adbe0d4fad1845c69772c2216af7c1f88c98a11460dc6";
+    "4d76e542c222ea8c75861d8c4ade60a1a332a63255ce1c60bdaebf7c2a2869e6";
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 pub const CODEX_NATIVE_SHA256: &str =
-    "2e863156ed35ecc5253b1e2f907a9143077b9f7cb51942070c61996471ff6e04";
+    "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da";
 
 #[cfg(not(any(
     all(target_os = "macos", target_arch = "aarch64"),

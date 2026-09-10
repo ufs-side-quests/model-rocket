@@ -6,7 +6,7 @@ import sys
 
 
 if sys.argv[1:] == ["--version"]:
-    print("codex-cli 0.146.0")
+    print("codex-cli 0.153.4")
     sys.exit(0)
 
 
