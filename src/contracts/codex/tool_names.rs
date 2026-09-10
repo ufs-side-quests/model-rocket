@@ -133,6 +133,13 @@ mod tests {
         let mapped = names.tools().first().ok_or("the tool was not mapped")?;
         assert_eq!(mapped.name, "model_rocket_tool_0");
         assert_eq!(names.claude_name("model_rocket_tool_0")?, original);
+
+        // Pin the accept side of the boundary too. Without it a regression that
+        // shrank the effective bound would still pass every other test, and
+        // re-break exactly the names this bound was raised for.
+        let at_bound = "x".repeat(MAX_CLAUDE_TOOL_NAME_BYTES);
+        let names = DynamicToolNames::from_claude_tools(&ToolSet::new(vec![tool(&at_bound, "")?]))?;
+        assert_eq!(names.claude_name("model_rocket_tool_0")?, at_bound);
         Ok(())
     }
 
